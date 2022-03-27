@@ -1,34 +1,99 @@
-hola() {
-  echo "Hola"
+#Otorga permisos de sudo a un usuario
+#El usuario podrá utilizar sudo para cualquier comando pero siempre con contraseña
+grantSudo() {
+  USER="$1"
+  #Agregar al grupo sudo
+  usermod -aG sudo ${USER}
+  #Agregar al archivo sudoers
+  echo "${USER}  ALL=(ALL) ALL" | tee /etc/sudoers.d/${USER}
 }
 
+#Remueve permisos de sudo a un usuario
+removeSudo() {
+  USER="$1"
+  #Eliminar del grupo "sudo"
+  gpasswd -d ${USER} sudo
+  #eliminar su archivo sudoers
+  rm /etc/sudoers.d/${USER}
+}
+
+#createUser: Crea un usuario común y configura su clave pública
 #Recibe los parámetros: <usuario> <contenido public key file>
-#Por ejemplo: createsshuser bob ssh-rsa AAAA...B3FBdxaQ== bob@example.com
-createsshuser() {
+#Por ejemplo: createUser bob ssh-rsa AAAA...B3FBdxaQ== bob@example.com
+createUser() {
   USER="$1"
   shift
-
   SSH_PUBLIC_KEY="$*"
 
-  PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-
-  # create a user with a random password
-  adduser ${USER}
-  echo ${USER}:${PASSWORD} | chpasswd
-
-  # add the user to the itport group
-  #  usermod -a -G itport ${USER}
+  # create a user with disabled password
+  useradd -md /home/${USER} ${USER}
+  #passwd -d ${USER}
 
   # add the ssh public key
   su - ${USER} -c "umask 022 ; mkdir .ssh ; echo $SSH_PUBLIC_KEY >> .ssh/authorized_keys"
+
+  ls /home/${USER}
+
+}
+
+#createSuperUser: Crea un usuario con permisos de sudo y configura su clave pública
+#Recibe los parámetros: <usuario> <contenido public key file>
+#Por ejemplo: createSuperUser bob ssh-rsa AAAA...B3FBdxaQ== bob@example.com
+createSuperUser() {
+  USER="$1"
+  shift
+  SSH_PUBLIC_KEY="$*"
+
+  # create a user and assign default password
+  useradd -md /home/${USER} ${USER}
+  echo ${USER}:${USER} | chpasswd
+
+  # add the ssh public key
+  su - ${USER} -c "umask 022 ; mkdir .ssh ; echo $SSH_PUBLIC_KEY >> .ssh/authorized_keys"
+
+  #grant sudo permissions
+  grantSudo ${USER}
+}
+
+#Elimina un usuario, sus carpetas y permisos
+deleteUser() {
+  USER="$1"
+  #Eliminar sus permisos
+  removeSudo ${USER}
+  #Eliminar usuario y su carpeta personal
+  userdel -r -f ${USER}
 }
 
 case $1 in
-hola)
-  hola
-  ;;
-createsshuser)
+grantSudo)
   shift
-  createsshuser $*
+  grantSudo $1
+  ;;
+removeSudo)
+  shift
+  removeSudo $1
+  ;;
+createUser)
+  shift
+  createUser $*
+  ;;
+createSuperUser)
+  shift
+  createSuperUser $*
+  ;;
+deleteUser)
+  shift
+  deleteUser $1
+  ;;
+*)
+  echo "Scripts disponibles:
+  createUser(4): Crea un usuario sin sudo y configura su clave pública. 
+    Ejemplo: createUser bob ssh-rsa AAAA...asbd= bob@examlpe.com
+  createSuperUser(4): Idem a createUser, y además configura permisos de sudo al usuario.
+  deleteUser(1): Elimina por completo un usuario, sus permisos y carpetas.
+    Ejemplo: deleteUser bob
+  grantSudo(1) y removeSudo(1): Otorgan y remueven permisos de sudo a un usuario.
+    Ejemplo: removeSudo bob
+  ";
   ;;
 esac
