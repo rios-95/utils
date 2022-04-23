@@ -26,7 +26,7 @@ createUser() {
   SSH_PUBLIC_KEY="$*"
 
   # create a user with disabled password
-  useradd -md /home/${USER} ${USER}
+  useradd -md /home/${USER} -s /bin/bash ${USER}
   #passwd -d ${USER}
 
   # add the ssh public key
@@ -45,7 +45,7 @@ createSuperUser() {
   SSH_PUBLIC_KEY="$*"
 
   # create a user and assign default password
-  useradd -md /home/${USER} ${USER}
+  useradd -md /home/${USER} -s /bin/bash ${USER}
   echo ${USER}:${USER} | chpasswd
 
   # add the ssh public key
